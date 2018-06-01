@@ -13,6 +13,7 @@ export gen_batch_data,
 	integrate_gradient
 
 """
+symbols are discrete symbols
 """
 function gen_batch_data{T}(mts::MTS, labels::Vector{T}, alphabet, batchsize::Int=50; 
                         b_normalize::Bool=true,
@@ -48,6 +49,8 @@ function accuracy(m, Xs, Ys)
     batchsize = size(Xs[1][1],2) 
     s = 0
     for (X,Y) in zip(Xs,Ys)
+        Flux.reset!(m)
+        Flux.truncate!(m)
         s += count(Flux.argmax(m.(X)[end]) .== Flux.argmax(Y[end]))
     end
     s / (batchsize*length(Xs))
@@ -55,6 +58,7 @@ end
 
 function predict(m, Xs, ind) 
     Flux.reset!(m)
+    Flux.truncate!(m)
 	m.(Xs[ind])[end]
 end
 truth(Ys, ind) = Ys[ind][end]
@@ -67,18 +71,20 @@ function seq_classifier_loss(m)
     end
 end
 
-function integrate_gradient(m, X, Y, loss, N=100; skiplast::Bool=false)
-	n_feats, n_steps = size(X[1],1), length(X)
-	A = zeros(n_feats, n_steps)
-	for n = 1:N
-    	xp = [param(X[i]*n/N) for i in 1:length(X)] #interpolate between zero and X
-    	Flux.truncate!(m)
-    	Flux.reset!(m)
-    	l = loss(xp, Y)
-    	Flux.back!(l)
-    	A += hcat([xp[i].grad[:,1] for i in 1:length(xp)]...)
-	end
-	return skiplast ? A[:,1:(end-1)] : A
+"""
+See: Sundararajan, Taly, Yan, "Axiomatic attribution for deep networks"
+Esp. equation 3.
+Also see: github.com/ankurtaly/Attributions
+"""
+function integrate_gradient(m, X, target_index::Int, N::Int=100; skiplast::Bool=false)
+    k = [i / N for i = 1:N] #assumes a zero baseline
+    XP = [param(x * k') for x in X] 
+    Flux.reset!(m)
+    Flux.truncate!(m)
+    y = m.(XP)[end][target_index, :]
+    Flux.back!(y, 1)
+    A = hcat([x .* mean(xp.grad, 2) for (x,xp) in zip(X,XP)]...) 
+	return skiplast ? A[:, 1:(end-1)] : A
 end
 
 end # module
