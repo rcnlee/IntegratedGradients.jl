@@ -10,7 +10,10 @@ export gen_batch_data,
     predict,
     truth,
     seq_classifier_loss,
-	integrate_gradient
+	integrate_gradient,
+    check_condition,
+    check_at_zero,
+    check_at_x
 
 """
 symbols are discrete symbols
@@ -87,4 +90,44 @@ function integrate_gradient(m, X, target_index::Int, N::Int=100; skiplast::Bool=
 	return skiplast ? A[:, 1:(end-1)] : A
 end
 
+function check_condition(m, X, target_index::Int, N::Int=100; verbose=true)
+    F0 = check_at_zero(m, X, target_index)
+    F1 = check_at_x(m, X, target_index)
+
+    A = integrate_gradient(m, X, target_index, N)
+    err = abs(sum(A) - (F1-F0))
+    verbose && println("Error is: $err")
+    
+    (err, sum(A), F1-F0)
+end
+
+function check_at_zero(m, X)
+    k0 = zeros(1)  #assumes a zero baseline
+    XP0 = [param(x * k0') for x in X] 
+    Flux.reset!(m)
+    Flux.truncate!(m)
+    y0 = m.(XP0)[end]
+    y0
+end
+function check_at_zero(m, X, target_index::Int)
+    y0 = check_at_zero(m, X)[target_index,:]
+    F0 = y0[1].tracker.data
+    F0
+end
+
+function check_at_x(m, X)
+    k1 = ones(1)  #assumes a zero baseline
+    XP1 = [param(x * k1') for x in X] 
+    Flux.reset!(m)
+    Flux.truncate!(m)
+    y1 = m.(XP1)[end]
+    y1
+end
+function check_at_x(m, X, target_index::Int)
+    y1 = check_at_x(m, X)[target_index,:]
+    F1 = y1[1].tracker.data
+    F1
+end
+
 end # module
+
