@@ -13,6 +13,7 @@ export gen_batch_data,
 	integrate_gradient,
     check_condition,
     check_at_zero,
+    check_at_one,
     check_at_x
 
 """
@@ -102,8 +103,7 @@ function check_condition(m, X, target_index::Int, N::Int=100; verbose=true)
 end
 
 function check_at_zero(m, X)
-    k0 = zeros(1)  #assumes a zero baseline
-    XP0 = [param(x * k0') for x in X] 
+    XP0 = [zeros(x) for x in X] 
     Flux.reset!(m)
     Flux.truncate!(m)
     y0 = m.(XP0)[end]
@@ -114,10 +114,16 @@ function check_at_zero(m, X, target_index::Int)
     F0 = y0[1].tracker.data
     F0
 end
+function check_at_one(m, X)
+    XP0 = [ones(x) for x in X] 
+    Flux.reset!(m)
+    Flux.truncate!(m)
+    y0 = m.(XP0)[end]
+    y0
+end
 
 function check_at_x(m, X)
-    k1 = ones(1)  #assumes a zero baseline
-    XP1 = [param(x * k1') for x in X] 
+    XP1 = [x for x in X] 
     Flux.reset!(m)
     Flux.truncate!(m)
     y1 = m.(XP1)[end]
