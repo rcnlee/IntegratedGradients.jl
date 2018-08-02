@@ -1,10 +1,5 @@
 module IntegratedGradients
 
-using MultivariateTimeSeries
-using Flux
-using Flux: onehot, batchseq, crossentropy
-using Base.Iterators
-
 export gen_batch_data, 
     accuracy,
     predict,
@@ -14,7 +9,16 @@ export gen_batch_data,
     check_condition,
     check_at_zero,
     check_at_one,
-    check_at_x
+    check_at_x,
+    OneHotVector_f,
+    onehot_f,
+    UniformHotVector_f,
+    uniformhot_f
+
+using MultivariateTimeSeries
+using Flux
+using Flux: onehot, batchseq, crossentropy, OneHotVector
+using Base.Iterators
 
 """
 symbols are discrete symbols
@@ -28,7 +32,7 @@ function gen_batch_data{T}(mts::MTS, labels::Vector{T}, alphabet, batchsize::Int
     mts = b_normalize ? normalize01(mts) : mts
     mts = b_stop_token ? append_stop_token(mts) : mts
     X = vec(mts)
-    Y_ = [onehot(lab, alphabet) for lab in labels]
+    Y_ = [lab in alphabet ? onehot_f(lab, alphabet) : uniformhot_f(alphabet) for lab in labels]
     rp = collect(1:length(mts)) 
     if b_shuffle
         rp = randperm(rng, length(mts))
@@ -134,6 +138,23 @@ function check_at_x(m, X, target_index::Int)
     F1 = y1[1].tracker.data
     F1
 end
+
+struct OneHotVector_f <: AbstractVector{Float64}
+    o::OneHotVector
+end
+Base.size(xs::OneHotVector_f) = size(xs.o)
+Base.getindex(xs::OneHotVector_f, i) = Float64(getindex(xs.o, i))
+
+onehot_f(l, labels) = OneHotVector_f(onehot(l,labels))
+onehot_f(l, labels, unk) = OneHotVector_f(onehot(l,labels,unk))
+
+struct UniformHotVector_f <: AbstractVector{Float64}
+    sz::Int
+end
+Base.size(xs::UniformHotVector_f) = (xs.sz,)
+Base.getindex(xs::UniformHotVector_f, i::Integer) = 1.0/xs.sz
+
+uniformhot_f(labels) = UniformHotVector_f(length(labels))
 
 end # module
 
